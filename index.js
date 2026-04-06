@@ -241,22 +241,35 @@ async function processMessage(phone, text) {
 
 // ── Webhook Z-API ──
 app.post('/webhook', async (req, res) => {
-  res.sendStatus(200); // Responde rápido pro Z-API
+  res.sendStatus(200);
 
   try {
     const body = req.body;
+    console.log('Webhook recebido:', JSON.stringify(body).slice(0, 300));
 
-    // Ignora mensagens enviadas por mim mesmo e grupos
-    if (body.fromMe || body.isGroup) return;
+    // Ignora grupos
+    if (body.isGroup || body.isGroupMsg) return;
 
-    const phone = body.phone;
-    const text = body.text?.message || body.text;
+    // Pega o telefone e texto — Z-API tem formatos diferentes
+    const phone = body.phone || body.from || '';
+    const text = body.text?.message || body.text || body.body || '';
 
-    if (!text || typeof text !== 'string') return;
+    if (!text || typeof text !== 'string' || text.trim() === '') return;
 
-    // Só responde pro meu número
-    if (MEU_NUMERO && !phone.includes(MEU_NUMERO.replace(/\D/g, ''))) return;
+    // Ignora mensagens de status/sistema
+    if (body.type && body.type !== 'ReceivedCallback' && body.type !== 'DeliveryCallback') {
+      // Aceita qualquer tipo de mensagem de texto
+    }
 
+    // Só processa mensagens do meu número
+    const meuNum = (MEU_NUMERO || '').replace(/\D/g, '');
+    const phoneClean = phone.replace(/\D/g, '');
+    if (meuNum && !phoneClean.includes(meuNum) && !meuNum.includes(phoneClean)) {
+      console.log('Número ignorado:', phone);
+      return;
+    }
+
+    console.log('Processando mensagem:', text, 'de', phone);
     await processMessage(phone, text);
   } catch (err) {
     console.error('Erro webhook:', err);
